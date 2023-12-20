@@ -5,8 +5,11 @@ A program for training an A.I. model to classify sequences into several classes 
 
 # Requirements
 Keras >= 2.11
+
 Tensorflow >= 2.11
+
 Numpy >= 1.20.2
+
 Python >= 3.8.12
 
 # Training a New Model
