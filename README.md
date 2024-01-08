@@ -36,7 +36,7 @@ These commands are used only during training:
 + `-mi` The maximum amount of instances for the training set for each class. Defaults to 1000.
 + `-lr` The learning rate of the model. Defaults to 0.001.
 + `-sl` The truncation or pad-to length of the sequences. Defaults to 128. 
-+ `-ed  The amount of embedding dims used in the model. Defaults to 32.
++ `-ed` The amount of embedding dims used in the model. Defaults to 32.
 + `-do` The dropout rate of the model, needs to be between 0 and 1. Defaults to 0.2.
 + `-vr` The validation split rate. Defaults to 0.25.
 + `-ep` The number of epochs to train for. Defaults to 16.
