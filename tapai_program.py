@@ -14,12 +14,14 @@ ff_help = "REQUIRED! File path to the folder containing the fasta files wanted f
 mp_help = "REQUIRED! File path to the model, in training it's the save path, in prediction it's the load path"
 bs_help = "Batchsize for the model during training or inference: Defaults to 128"
 # args used only during inference
-nn_help = "The node names for the model"
+sa_help = "Whether to save all model outputs or only those of the last mode. defaults to False"
+cn_help = "The node to continue in the model stack; used for multiple models"
+nn_help = "Name of the output nodes of the model(s)"
 of_help = "Folder where the output fast files go: defaults to program_out in working directory"
 th_help = "Threshold value for model outputs: defaults to 0 (see documentation for more detail)"
 # args only used during training
 pm_help = "A file path to a saved Keras model: defaults to None. ONLY USED WHEN TRAINING"
-im_help = "The max amount of training instances for all classes. defaults to 1000. ONLY USED WHEN TRAINING"
+mi_help = "The max amount of training instances for all classes. defaults to 1000. ONLY USED WHEN TRAINING"
 lr_help = "The learning rate of the model: defaults to 1e-3. ONLY USED WHEN TRAINING"
 sl_help = "The truncation or pad-to length of the sequences: defaults to 128. ONLY USED WHEN TRAINING"
 ed_help = "The amount of embedding dims used in the model: defaults to 32. ONLY USED WHEN TRAINING"
@@ -31,15 +33,17 @@ ep_help = "The number of epochs to train for: defaults to 16. ONLY USED WHEN TRA
 parser = argparse.ArgumentParser("TAPAI: Transcriptome Processing by Artificial Intelligence")
 parser.add_argument("function", choices=["predict", "train"], type=str, help=func_help) # gets whether to train or predict
 parser.add_argument("-ff", type=str, help=ff_help, required=True) # gets the folder with the fasta files
-parser.add_argument("-mp", type=str, help=mp_help, required=True) # gets the model
+parser.add_argument("-mp", type=str, nargs="+", help=mp_help, required=True) # gets the model(s)
 parser.add_argument("-bs", type=int, help=bs_help, default=128) # gets batchsize
 # args used only during inference
+parser.add_argument("-sa", action="store_true", help=sa_help, default=False)
 parser.add_argument("-nn", type=str, nargs="+", help=nn_help, default=None)
+parser.add_argument("-cn", type=int, nargs="+", help=cn_help, default=None)
 parser.add_argument("-of", type=str, help=of_help, default="program_out") # gets the folder to put outputs
 parser.add_argument("-th", type=float, help=th_help, default=-1.0) # gets threshold
 # args only used during training
 parser.add_argument("-pm", type=str, help=pm_help, default=None)
-parser.add_argument("-im", type=int, help=im_help, default=1000)
+parser.add_argument("-mi", type=int, help=mi_help, default=1000)
 parser.add_argument("-lr", type=float, help=lr_help, default=1e-3)
 parser.add_argument("-sl", type=int, help=sl_help, default=128)
 parser.add_argument("-ed", type=int, help=ed_help, default=32)
@@ -125,13 +129,11 @@ def get_array_from_fasta(fasta_lines):
     return np.concatenate((info_np,aa_np),axis=1)
 
 
-def write_array(array, model_out, node_dict):
-    if threshold > 0.0:
-        out_indices = np.where(model_out.max(axis=-1)>=threshold)
-        model_out = model_out[out_indices]
-
-    # argmax output for the class
-    model_out = np.argmax(model_out, axis=-1)
+def write_array(array, model_out, node_dict, fasta_index):
+    fasta_file = fasta_files[fasta_index]
+    sp = path.join(save_path, fasta_file)
+    if not path.exists(sp):
+        mkdir(sp)
 
     # write output to files
     for key in node_dict.keys():
@@ -139,7 +141,7 @@ def write_array(array, model_out, node_dict):
         cls_index = np.where(model_out == key) 
         cls = array[cls_index]
         
-        file_name = path.join(save_path, node_dict[key]) +".fasta"
+        file_name = path.join(sp, node_dict[key])+".fasta"
         f = open(file_name, "a", encoding="utf8")
 
         # write the lines
@@ -153,7 +155,9 @@ def write_array(array, model_out, node_dict):
 
 # what to do during inference
 if predict:
+    save_all = args.sa # whether to save all model outputs or only that of the last
     node_names = args.nn # get the name of the models nodes
+    cont_nodes = args.cn # get the nodes to continue
     save_path = args.of # folder you want the output files saved to
     model_path = args.mp # path to each model, order in list is execution order
     threshold = args.th # threshold for the sequence to be saved as a class
@@ -163,25 +167,42 @@ if predict:
         mkdir(save_path)
     assert threshold <= 1.0 , "The Threshold value cannot be >= 1!"
 
-    # load in the model
-    model = keras.models.load_model(model_path)
-    model.trainable = False
-    out_shape = model.get_layer(index=-1).output_shape
-    assert len(out_shape) == 2, "The output shape of the model should be (None, num_classes)"
+    # check inputs
+    assert len(model_path) >= 1, "A path to a model must be provided"
+    if len(model_path) > 1:
+        assert len(cont_nodes) == len(model_path)-1, "There should be one fewer continue node than model"
+    else:
+        assert cont_nodes is None, "The -cn argument should not be used with only 1 model for predicting"
     
-    # get the node dictionary, if node names exist
-    node_dict = dict({})
-    if node_names:
-        for i, name in enumerate(node_names):
-            node_dict[i] = name
-    else: # otherwise make one using the model output shape
-        for i in range(out_shape[0]):
-            node_dict[i] = "class_"+str(i)
+    for mp in model_path:
+        assert path.exists(mp), "Cannot find model with path: " + str(mp)
+
+    # load in the models
+    model_list = [] # stores the models
+    node_dicts = [] # stores the node dict for each model
+    nn_index = 0 # stores the current index at node names
+    for mp in model_path:
+        model = keras.models.load_model(mp)
+        model.trainable = False
+        out_shape = model.get_layer(index=-1).output_shape
+        assert len(out_shape) == 2, "The output shape of the model should be (None, num_classes)"
+        model_list.append(model)
+    
+        # get the node dictionary, if node names exist
+        nd = dict({})
+        if nn_index < len(node_names):
+            for i in range(out_shape[1]):
+                nd[i] = node_names[nn_index]
+                nn_index += 1
+        else: # otherwise make one using the model output shape
+            for i in range(out_shape[1]):
+                nd[i] = "class_"+str(i)
+        node_dicts.append(nd) # append the node dict for the model
 
     count = 0 # stores how many sequences have been found
     line_batch = [] # stores all the lines in the sequences
     # iterate thru the fasta files
-    for fasta in fasta_paths:
+    for fasta_index, fasta in enumerate(fasta_paths):
         f = open(fasta, "r") # open the file
 
         line = next(f, None)
@@ -191,9 +212,25 @@ if predict:
                 # if there are enough sequences to make a batch
                 if count >= batchsize: 
                     arr = get_array_from_fasta(line_batch) # get the batch array
-                    # get the batch output, [:,1] removes the '>' line from the array
-                    model_out = model.predict_on_batch(arr[:,1]) 
-                    write_array(arr, model_out, node_dict) # write the output to files
+                    model_in = arr[:,1] # [:,1] removes the '>' line column from the array
+
+                    for i, model in enumerate(model_list): # iterate thru the models
+                        model_out = model.predict_on_batch(model_in) # get the batch output
+                        out_ag = np.argmax(model_out, axis=-1) # argmax the output
+
+                        if i == len(model_list)-1 or save_all: # write the output to files
+                                write_array(arr, out_ag, node_dicts[i], fasta_index) 
+
+                        # get the next model input using cont_nodes if there are more models to go
+                        if i != len(model_list)-1:
+                            if threshold > 0.0: # apply threshold if needed
+                                ti = np.where(model_out.max(axis=-1)>=threshold)
+                                out_ag = model_out[ti]
+                            # get the needed indices to continue
+                            out_indices = np.where(out_ag == cont_nodes[i]) 
+                            arr = arr[out_indices] # reduce the array for the next pass thru
+                            model_in = arr[:,1]
+
                     count = 0 # reset count
                     line_batch.clear() # clear line batch
                 
@@ -219,12 +256,13 @@ else:
     epochs = args.ep # get the number of epochs to train for
     load_premade = args.pm is not None # whether to load a pretrained model or not
     premade_path = args.pm # path to the pretrined model
-    max_instances = args.im # the max amount of isntances
+    max_instances = args.mi # the max amount of isntances
     rng = np.random.default_rng()
 
     if load_premade:
         assert path.exists(premade_path), "Path to the premade model cannot be found"
     assert(len(model_save_path)) == 1, "Only one model can be trained at a time"
+    model_save_path = model_save_path[0]
 
     # create a class dictionary
     class_dict = dict({})
