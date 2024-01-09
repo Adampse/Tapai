@@ -36,7 +36,7 @@ parser.add_argument("-ff", type=str, help=ff_help, required=True) # gets the fol
 parser.add_argument("-mp", type=str, nargs="+", help=mp_help, required=True) # gets the model(s)
 parser.add_argument("-bs", type=int, help=bs_help, default=128) # gets batchsize
 # args used only during inference
-parser.add_argument("-sa", action="store_true", help=sa_help, default=False)
+parser.add_argument("--save_all", action="store_true", help=sa_help, default=False)
 parser.add_argument("-nn", type=str, nargs="+", help=nn_help, default=None)
 parser.add_argument("-cn", type=int, nargs="+", help=cn_help, default=None)
 parser.add_argument("-of", type=str, help=of_help, default="program_out") # gets the folder to put outputs
@@ -155,7 +155,7 @@ def write_array(array, model_out, node_dict, fasta_index):
 
 # what to do during inference
 if predict:
-    save_all = args.sa # whether to save all model outputs or only that of the last
+    save_all = args.save_all # whether to save all model outputs or only that of the last
     node_names = args.nn # get the name of the models nodes
     cont_nodes = args.cn # get the nodes to continue
     save_path = args.of # folder you want the output files saved to
@@ -168,9 +168,9 @@ if predict:
     assert threshold <= 1.0 , "The Threshold value cannot be >= 1!"
 
     # check inputs
-    assert len(model_path) >= 1, "A path to a model must be provided"
+    assert len(model_path) >= 1 and model_path[0] is not None, "A path to a model must be provided"
     if len(model_path) > 1:
-        assert len(cont_nodes) == len(model_path)-1, "There should be one fewer continue node than model"
+        assert len(cont_nodes) == len(model_path)-1, "There should be one fewer continue nodes than models"
     else:
         assert cont_nodes is None, "The -cn argument should not be used with only 1 model for predicting"
     
@@ -181,23 +181,26 @@ if predict:
     model_list = [] # stores the models
     node_dicts = [] # stores the node dict for each model
     nn_index = 0 # stores the current index at node names
-    for mp in model_path:
+    for index, mp in enumerate(model_path):
         model = keras.models.load_model(mp)
         model.trainable = False
         out_shape = model.get_layer(index=-1).output_shape
         assert len(out_shape) == 2, "The output shape of the model should be (None, num_classes)"
         model_list.append(model)
-    
-        # get the node dictionary, if node names exist
-        nd = dict({})
-        if nn_index < len(node_names):
-            for i in range(out_shape[1]):
-                nd[i] = node_names[nn_index]
-                nn_index += 1
-        else: # otherwise make one using the model output shape
-            for i in range(out_shape[1]):
-                nd[i] = "class_"+str(i)
-        node_dicts.append(nd) # append the node dict for the model
+
+        nd = dict({}) 
+        # only get node names of all models if --save_all
+        # otherwise just get the node names for the last model
+        if index == len(model_path)-1 or save_all: 
+            # get the node dictionary, if node names exist
+            if nn_index < len(node_names):
+                for i in range(out_shape[1]):
+                    nd[i] = node_names[nn_index]
+                    nn_index += 1
+            else: # otherwise make one using the model output shape
+                for i in range(out_shape[1]):
+                    nd[i] = "model_"+str(index)+"_class_"+str(i)
+            node_dicts.append(nd) # append the node dict for the model
 
     count = 0 # stores how many sequences have been found
     line_batch = [] # stores all the lines in the sequences
@@ -219,7 +222,9 @@ if predict:
                         out_ag = np.argmax(model_out, axis=-1) # argmax the output
 
                         if i == len(model_list)-1 or save_all: # write the output to files
-                                write_array(arr, out_ag, node_dicts[i], fasta_index) 
+                            if save_all: nd = node_dicts[i] # if --save_all, get the node dict that matches the model
+                            else: nd = node_dicts[0] # otherwise just get the only node dict for the final model
+                            write_array(arr, out_ag, nd, fasta_index) 
 
                         # get the next model input using cont_nodes if there are more models to go
                         if i != len(model_list)-1:
@@ -268,7 +273,6 @@ else:
     class_dict = dict({})
     for i, f_f in enumerate(fasta_files):
         class_dict[i] = f_f
-    print("\n Model Dictionary: ",class_dict,"\n")
 
     # read in the fasta files and assemble a dataset
     # will just load in all fasta files and concat as numpy arr's
@@ -310,6 +314,9 @@ else:
     if load_premade:
         model = keras.models.load_model(premade_path)
         model.trainable = True
+        out_shape = model.get_layer(index=-1).output_shape[1]
+        assert len(out_shape) == 2, "The output shape of the model should be (None, num_classes)"
+        assert out_shape == len(fasta_files), "The number of output nodes must be equal to the number of classes/fasta files"
     else:
         model = keras.Sequential()
         model.add(layers.Input([1,], dtype=tf.string)) # needs an explicit input layer & dtype
@@ -324,10 +331,10 @@ else:
             model.add(layers.LeakyReLU())
         model.add(layers.Flatten())
         model.add(layers.Dense(len(class_dict), activation='softmax'))
+        # adapt the TextVectorization layer
+        model.get_layer(index=0).adapt(X_train)
     
     model.summary() # output the model summary
-    # adapt the TextVectorization layer
-    model.get_layer(index=0).adapt(X_train)
 
     # train the model
     loss_func = keras.losses.SparseCategoricalCrossentropy(from_logits=False)
@@ -351,9 +358,13 @@ else:
         # calculate accuracy
         acc = 1.0 - (non_zeros/out.shape[0])
         print(class_dict[i], " Accuracy: ", acc)
-    
-    # save the model, it is in a list hence [0]
-    model.save(model_save_path[0])
+
+    # print out the model dictionary
+    print("\n Model Dictionary")
+    for key in class_dict.keys():
+        print("Node ",key," = ", class_dict[key])
+    # save the model
+    model.save(model_save_path)
 
     
 
