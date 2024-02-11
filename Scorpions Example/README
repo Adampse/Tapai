@@ -1,2 +1,1 @@
-Housekeeping model sorts out non toxins from the transcriptome; trained using the Positive and Negative fasta files.
-Channel model classifies sequences into one of four class, calcium, potassium, sodium, or venom; trained using calcium, potassium, and sodium toxins, and venom fasta files.
+# Data used to train the example models here.
