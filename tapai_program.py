@@ -1,5 +1,5 @@
-import keras
-import keras.layers as layers
+import tf_keras
+import tf_keras.layers as layers
 import argparse
 import tensorflow as tf
 import numpy as np
@@ -182,8 +182,9 @@ if predict:
     node_dicts = [] # stores the node dict for each model
     nn_index = 0 # stores the current index at node names
     for index, mp in enumerate(model_path):
-        model = keras.models.load_model(mp)
+        model = tf_keras.models.load_model(mp)
         model.trainable = False
+        #layer = layers.TFSMLayer(mp, call_endpoint="serving_default")
         out_shape = model.get_layer(index=-1).output_shape
         assert len(out_shape) == 2, "The output shape of the model should be (None, num_classes)"
         model_list.append(model)
@@ -312,13 +313,13 @@ else:
 
     # create the model based on the number of fasta files
     if load_premade:
-        model = keras.models.load_model(premade_path)
+        model = tf_keras.models.load_model(premade_path)
         model.trainable = True
         out_shape = model.get_layer(index=-1).output_shape[1]
         assert len(out_shape) == 2, "The output shape of the model should be (None, num_classes)"
         assert out_shape == len(fasta_files), "The number of output nodes must be equal to the number of classes/fasta files"
     else:
-        model = keras.Sequential()
+        model = tf_keras.Sequential()
         model.add(layers.Input([1,], dtype=tf.string)) # needs an explicit input layer & dtype
         model.add(layers.TextVectorization(max_tokens=30,
                                             output_mode='int',
@@ -337,8 +338,8 @@ else:
     model.summary() # output the model summary
 
     # train the model
-    loss_func = keras.losses.SparseCategoricalCrossentropy(from_logits=False)
-    model.compile(optimizer=keras.optimizers.Adam(learning_rate), loss=loss_func, metrics=["accuracy"])
+    loss_func = tf_keras.losses.SparseCategoricalCrossentropy(from_logits=False)
+    model.compile(optimizer=tf_keras.optimizers.Adam(learning_rate), loss=loss_func, metrics=["accuracy"])
     model.fit(X_train, Y_train, batch_size=batchsize, epochs=epochs,
             validation_data=(X_val, Y_val))
     
@@ -365,6 +366,26 @@ else:
         print("Node ",key," = ", class_dict[key])
     # save the model
     model.save(model_save_path)
+
+    
+
+
+
+
+    
+
+
+
+
+
+
+
+
+    
+
+
+
+
 
     
 
