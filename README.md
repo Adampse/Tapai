@@ -4,10 +4,8 @@
 A program for training an A.I. model to classify protein sequences into several classes and for running inference with trained models. Users provide the fasta files for training with each fasta file being considered its own class. During inference each fasta file provided will be put through the model or models sequentially. The goal of this program is to provide those who lack experience with A.I. to build and apply basic models for custom classification tasks.
 
 ## Requirements
-+ Keras >= 2.11
-+ Tensorflow >= 2.11
-+ Numpy >= 1.20.2
-+ Python >= 3.8.12
++ Tensorflow = 2.16.0
++ tf_keras = 2.16.0
 
 ## Running
 No installation is required, download tapai_program.py and run from the command line.
