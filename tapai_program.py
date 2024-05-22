@@ -271,6 +271,7 @@ if predict:
                     out_indices = np.where(out_ag == cont_nodes[i]) 
                     arr = arr[out_indices] # reduce the array for the next pass thru
                     model_in = arr[:,1]
+            line_batch.clear()
                     
         f.close() # close the file
 
