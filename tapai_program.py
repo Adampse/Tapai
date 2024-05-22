@@ -247,7 +247,31 @@ if predict:
             else: # otherwise just append the line to line_batch
                 line_batch.append(line)
             line = next(f, None) # get the next line
+            
+        # if there are no sequences left but there is stuff in line batch
+        if line_batch:
+            arr = get_array_from_fasta(line_batch) # get the batch array
+            model_in = arr[:,1] # [:,1] removes the '>' line column from the array
 
+            for i, model in enumerate(model_list): # iterate thru the models
+                model_out = model.predict_on_batch(model_in) # get the batch output
+                out_ag = np.argmax(model_out, axis=-1) # argmax the output
+
+                if i == len(model_list)-1 or save_all: # write the output to files
+                    if save_all: nd = node_dicts[i] # if --save_all, get the node dict that matches the model
+                    else: nd = node_dicts[0] # otherwise just get the only node dict for the final model
+                    write_array(arr, out_ag, nd, fasta_index) 
+
+                # get the next model input using cont_nodes if there are more models to go
+                if i != len(model_list)-1:
+                    if threshold > 0.0: # apply threshold if needed
+                        ti = np.where(model_out.max(axis=-1)>=threshold)
+                        out_ag = model_out[ti]
+                    # get the needed indices to continue
+                    out_indices = np.where(out_ag == cont_nodes[i]) 
+                    arr = arr[out_indices] # reduce the array for the next pass thru
+                    model_in = arr[:,1]
+                    
         f.close() # close the file
 
 
