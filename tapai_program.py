@@ -339,9 +339,9 @@ else:
     if load_premade:
         model = tf_keras.models.load_model(premade_path)
         model.trainable = True
-        out_shape = model.get_layer(index=-1).output_shape[1]
+        out_shape = model.get_layer(index=-1).output_shape
         assert len(out_shape) == 2, "The output shape of the model should be (None, num_classes)"
-        assert out_shape == len(fasta_files), "The number of output nodes must be equal to the number of classes/fasta files"
+        assert out_shape[1] == len(fasta_files), "The number of output nodes must be equal to the number of classes/fasta files"
     else:
         model = tf_keras.Sequential()
         model.add(layers.Input([1,], dtype=tf.string)) # needs an explicit input layer & dtype
