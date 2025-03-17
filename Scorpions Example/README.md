@@ -8,7 +8,7 @@ Used to train the housekeeping model to differentiate between toxin (positive) a
 
 ## Channel Data & Model
 Used to train the channel model to sort positive seqeunces as classified by the housekeeping model into 1 of 4 classes; Calcium channel, Potassium channel, Sodium channel, and Venom (a miscellaneous category). The channel model was trained with a validation split of 0.25 and max instances set to 150, `-mi 150`. This model achieves 80%, 85.11%, 93.88%, and 92.86% validation accuracy for  Calcium channel, Potassium channel, Sodium channel, and Venom classes respectively.
-+ Calcium Instances: 96
++ Calcium Instances: 89
 + Potassium Instances: 620
 + Sodium Instances: 702
 + Venom Instances: 167
