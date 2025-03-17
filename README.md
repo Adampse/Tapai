@@ -16,10 +16,11 @@ These commands are used both during training of new models and inference:
 + `-ff` REQUIRED: Path to the folder holding the fasta files for either training or inference.
 + `-mp` REQURIED: During training this is the path where the new model will be saved. During inference this a path to one or more models (see running inference for more detail).
 + `-bs` Batchsize of data during training and how to batch the data during inference. Defualts to 128 in both cases.
++ `-eb` The protein sequence embedding to be used, variable length embeddings should ha
 
 
 ## Training a New Model
-TAPAI allows user to train new models on data for specific tasks. A Basic convolutional model will be built if no model is provided. A pre-built model can be supplied using the `-pm` command followed by the path to the model. ***The pre-built model must accept a whitespace delineated string as an input and have the same number of output nodes as classes***. Fasta files are used to provide the training data with each fasta file being a single class and all fasta files for training being located in a single folder. Training is meant for smaller datasets, < 10000 sequences, as larger datasets will consume large amounts of memory as all training data is loaded into memory at once as a numpy array.
+TAPAI allows user to train new models on data for specific tasks. A Basic convolutional model will be built if no model is provided. A pre-built model can be supplied using the `-pm` command followed by the path to the model. ***The pre-built model must accept used one of the embedding options presented for input and have the same number of output nodes as classes***. Fasta files are used to provide the training data with each fasta file being a single class and all fasta files for training being located in a single folder. Training is meant for smaller datasets, < 10000 sequences, as larger datasets will consume large amounts of memory as all training data is loaded into memory at once as a numpy array.
 
 
 ### Training Example
