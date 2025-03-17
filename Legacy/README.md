@@ -1,1 +1,1 @@
-Legacy model kept for replicability of the paper Optimizing scorpion transcriptome processing through artificial intelligences (Psenicnik et al., 2024).
+Legacy model kept for replicability of the paper Optimizing scorpion transcriptome processing through artificial intelligences (Psenicnik et al., 2024). Tensorflow_keras 2.16 is required for this version.
